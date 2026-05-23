@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-2: #f5f4ef;
+    --bg-3: #ecebe4;
+    --text: #1a1a1a;
+    --text-2: #5a5a55;
+    --text-3: #8a8a82;
+    --border: rgba(0,0,0,0.12);
+    --border-2: rgba(0,0,0,0.22);
+    --accent: #185fa5;
+    --accent-bg: #E6F1FB;
+    --err: #993C1D;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg-2: #252523;
+      --bg-3: #2f2f2c;
+      --text: #ececea;
+      --text-2: #a8a8a3;
+      --text-3: #6f6f6a;
+      --border: rgba(255,255,255,0.12);
+      --border-2: rgba(255,255,255,0.22);
+      --accent: #85b7eb;
+      --accent-bg: #042C53;
+      --err: #E08C70;
+    }
+  }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:var(--font); font-size:16px; line-height:1.5; }
+  .container { max-width:760px; margin:0 auto; padding:1.5rem 1rem; }
+  h1 { font-size:20px; font-weight:500; margin:0 0 4px; }
+  .subtitle { font-size:13px; color:var(--text-3); margin-bottom:1rem; }
+  .header-row { display:flex; align-items:baseline; gap:12px; margin-bottom:4px; }
+  .gen-label { font-size:13px; color:var(--text-2); }
+  .instructions { font-size:12px; color:var(--text-2); background:var(--bg-2); border-radius:var(--radius-md); padding:8px 12px; margin-bottom:12px; }
+  #grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+  .card { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:10px 12px; cursor:pointer; transition:all .15s; min-height:200px; display:flex; flex-direction:column; position:relative; }
+  .card:hover { border-color:var(--border-2); }
+  .card.selected { border-color:var(--accent); background:var(--accent-bg); }
+  .card.selected .select-badge { display:flex; }
+  .select-badge { display:none; position:absolute; top:8px; right:8px; width:20px; height:20px; border-radius:50%; background:var(--accent); color:white; font-size:11px; font-weight:500; align-items:center; justify-content:center; z-index:2; }
+  .card-actions { position:absolute; top:8px; right:8px; display:flex; gap:4px; z-index:3; }
+  .card.selected .card-actions { display:none; }
+  .icon-btn { width:22px; height:22px; border-radius:50%; background:var(--bg-2); border:0.5px solid var(--border); color:var(--text-2); font-size:11px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+  .icon-btn:hover { background:var(--bg-3); color:var(--text); }
+  .icon-btn.inspect { font-size:13px; }
+  .card-title { font-size:13px; font-weight:500; padding-right:28px; line-height:1.3; max-height:1.3em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chart-wrap { position:relative; height:140px; margin:6px 0; flex:1; overflow:hidden; }
+  .chart-wrap iframe { width:100%; height:100%; border:none; display:block; background:transparent; pointer-events:none; }
+  .card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:auto; font-size:11px; color:var(--text-3); }
+  .controls { margin-top:1.25rem; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { background:transparent; border:0.5px solid var(--border-2); border-radius:var(--radius-md); padding:6px 12px; font-size:13px; color:var(--text); cursor:pointer; font-family:inherit; }
+  button:hover:not(:disabled) { background:var(--bg-2); }
+  button:disabled { opacity:0.4; cursor:not-allowed; }
+  button.primary { background:var(--accent); color:white; border-color:var(--accent); }
+  button.primary:hover:not(:disabled) { opacity:0.9; background:var(--accent); }
+  #history { margin-top:1rem; font-size:12px; color:var(--text-3); min-height:1.5em; }
+  .error-card { height:100%; display:flex; flex-direction:column; padding:8px; background:var(--bg-2); border-radius:var(--radius-md); overflow:auto; }
+  .error-tag { font-size:10px; color:var(--err); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .error-msg { font-size:11px; color:var(--err); font-family:var(--mono); line-height:1.3; word-break:break-word; }
+  .skeleton { background:linear-gradient(90deg, var(--bg-2), var(--bg-3), var(--bg-2)); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:var(--radius-md); height:100%; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .status { font-size:12px; color:var(--text-2); }
+
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:none; align-items:flex-start; justify-content:center; z-index:100; padding:2rem 1rem; overflow-y:auto; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); max-width:680px; width:100%; padding:1.5rem; position:relative; }
+  .modal-close { position:absolute; top:12px; right:12px; width:28px; height:28px; border-radius:50%; background:var(--bg-2); border:0.5px solid var(--border); cursor:pointer; font-size:16px; line-height:1; color:var(--text-2); display:flex; align-items:center; justify-content:center; padding:0; }
+  .modal-title { font-size:18px; font-weight:500; margin:0 0 4px; padding-right:32px; }
+  .modal-subtitle { font-size:12px; color:var(--text-3); margin-bottom:1rem; }
+  .modal-chart { height:340px; background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-md); overflow:hidden; margin-bottom:1rem; }
+  .modal-chart iframe { width:100%; height:100%; border:none; display:block; background:transparent; }
+  .modal-section { margin-bottom:1rem; }
+  .modal-section-label { font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+  .modal-explain { font-size:14px; color:var(--text); line-height:1.5; }
+
+  .seed-screen { text-align:center; padding:3rem 1rem; }
+  .seed-screen h2 { font-size:18px; font-weight:500; }
+  .seed-screen p { color:var(--text-2); font-size:14px; max-width:480px; margin:0 auto 1.5rem; }
+  .vocab-bar { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-3); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header-row">
+    <h1>Dashboard breeder</h1>
+    <span class="gen-label" id="gen-label">generation 1</span>
+  </div>
+  <div class="subtitle">pick two charts that catch your eye · the next generation mashes them together · keep going until something does</div>
+
+  <div class="instructions" id="instructions">pick TWO cards as parents · click breed when ready</div>
+
+  <div id="grid"></div>
+  <div id="seed-screen" class="seed-screen" style="display:none;">
+    <h2>Loading the vocabulary…</h2>
+    <p>One moment while the chart primitives load. After this, breeding is instant — no waiting, no API calls, just pick and click.</p>
+    <button class="primary" id="seed-btn">start</button>
+    <div class="status" id="seed-status" style="margin-top:1rem;"></div>
+  </div>
+
+  <div class="controls">
+    <button id="breed" class="primary" disabled>breed selected (0/2)</button>
+    <button id="reset">reset</button>
+    <button id="expand-vocab">need fresh ideas?</button>
+    <div class="vocab-bar"><span id="vocab-count">vocabulary: 0 primitives</span></div>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="history"></div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">×</button>
+    <h2 class="modal-title" id="modal-title"></h2>
+    <div class="modal-subtitle" id="modal-subtitle"></div>
+    <div class="modal-chart" id="modal-chart"></div>
+    <div class="modal-section">
+      <div class="modal-section-label">lineage</div>
+      <div class="modal-explain" id="modal-lineage"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ===== EDIT THIS: point at your deployed Render proxy =====
+  const PROXY_URL = 'https://YOUR-RENDER-APP.onrender.com/api/breed';
+  // ==========================================================
+
+  // ---------- DATA ----------
+  function seed(s){ return function(){ s = (s*9301+49297)%233280; return s/233280; }; }
+  const rnd = seed(42);
+  const STATES = ['CA','TX','NY','FL','PA','IL','OH','GA','NC','MI','WA','AZ','MA','VA','TN','IN','MO','MD','WI','CO'];
+  const counties = [];
+  for (let i = 0; i < 200; i++) {
+    const state = STATES[i % STATES.length];
+    const base = 3 + rnd() * 4;
+    const covidSpike = 8 + rnd() * 18;
+    const recoverySlope = -0.2 - rnd() * 0.6;
+    const monthly = [];
+    for (let m = 0; m < 72; m++) {
+      let v = base + (rnd()-0.5)*0.6;
+      if (m >= 14 && m <= 18) v = base + covidSpike * Math.exp(-Math.pow(m-15,2)/2);
+      else if (m > 18) v = Math.max(base, base + covidSpike*0.4 + recoverySlope*(m-18) + (rnd()-0.5)*0.5);
+      monthly.push(Math.max(1.5, v));
+    }
+    counties.push({ id:i, state, base, covidSpike, recoverySlope, monthly, current:monthly[71], nameLen:4+Math.floor(rnd()*10) });
+  }
+  const stateData = STATES.map(s => {
+    const cs = counties.filter(c => c.state === s);
+    const monthly = [];
+    for (let m=0; m<72; m++) {
+      const vals = cs.map(c => c.monthly[m]);
+      monthly.push(vals.reduce((a,v)=>a+v,0)/vals.length);
+    }
+    return {
+      state: s, monthly, current: monthly[71],
+      base: cs.reduce((a,c)=>a+c.base,0)/cs.length,
+      covidSpike: cs.reduce((a,c)=>a+c.covidSpike,0)/cs.length,
+      recoverySlope: cs.reduce((a,c)=>a+c.recoverySlope,0)/cs.length,
+      countyCount: cs.length
+    };
+  });
+  const national = { monthly: [] };
+  for (let m=0; m<72; m++) national.monthly.push(counties.reduce((a,c)=>a+c.monthly[m],0)/counties.length);
+
+  const tilePositions = {
+    'WA': {col:0, row:1}, 'CA': {col:0, row:3}, 'AZ': {col:1, row:4},
+    'CO': {col:2, row:3}, 'TX': {col:3, row:5}, 'MO': {col:4, row:3},
+    'WI': {col:4, row:1}, 'IL': {col:4, row:2}, 'IN': {col:5, row:2},
+    'MI': {col:5, row:1}, 'OH': {col:5, row:2}, 'TN': {col:5, row:4},
+    'GA': {col:6, row:5}, 'FL': {col:7, row:6}, 'NC': {col:7, row:4},
+    'VA': {col:7, row:3}, 'MD': {col:8, row:3}, 'PA': {col:7, row:2},
+    'NY': {col:8, row:1}, 'MA': {col:9, row:1}
+  };
+  stateData.forEach(s => {
+    const pos = tilePositions[s.state] || {col:0, row:0};
+    s.tileCol = pos.col;
+    s.tileRow = pos.row;
+  });
+
+  const dataPayload = { counties, states: stateData, national, tileGrid: { cols: 10, rows: 7 } };
+
+  // ---------- KNOB SPACE ----------
+  // Keep this small. The original v7 had 7 knobs. We're sticking close to that.
+  const KNOB_SPACE = {
+    metric: ['currentRate', 'baseRate', 'covidSpike', 'recoverySlope', 'variance'],
+    palette: ['cool', 'warm', 'diverging', 'qualitative', 'mono'],
+    sort: ['ascending', 'descending', 'alphabetical', 'random', 'unsorted'],
+    density: [0.3, 0.5, 0.7, 1.0],
+    transform: ['linear', 'log', 'sqrt', 'inverted'],
+    granularity: ['county', 'state', 'national'],
+    timeMode: ['forward', 'reversed', 'circular', 'spiraled']
+  };
+
+  function randChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function randomGenome(primitiveId, primitives) {
+    const prim = primitives.find(p => p.id === primitiveId);
+    const knobs = {};
+    (prim.knobs || []).forEach(k => { knobs[k] = randChoice(KNOB_SPACE[k] || ['default']); });
+    return { primitive: primitiveId, knobs };
+  }
+
+  // ---------- POETIC TITLE MASHUP ----------
+  // Browser-side mashup: pull words from each parent's title, weave them together.
+  const FILLER = new Set(['the','and','of','a','an','in','on','to','for','at','by','with','from','as','is','are','that','this','vs']);
+  const CONNECTORS = [" of ", " through ", " in ", " and ", " over ", " against ", " toward ", " under ", " into ", " before "];
+
+  function wordsOf(title) {
+    if (!title) return [];
+    return title.toLowerCase().split(/[\s\-]+/).filter(w => w.length > 0);
+  }
+  function pickContent(words) {
+    const content = words.filter(w => !FILLER.has(w));
+    return content.length ? randChoice(content) : (words[0] || 'thing');
+  }
+
+  function mashTitle(parentA, parentB) {
+    const wordsA = wordsOf(parentA.title);
+    const wordsB = wordsOf(parentB.title);
+    const wA = pickContent(wordsA);
+    const wB = pickContent(wordsB);
+    if (wA === wB) {
+      // Same word from both — surprisingly common, fall back to picking a different one from B
+      const altB = wordsB.filter(w => w !== wA && !FILLER.has(w));
+      const fallback = altB.length ? randChoice(altB) : wB;
+      return wA + ' ' + fallback;
+    }
+    const connector = randChoice(CONNECTORS);
+    // Sometimes flip order so we don't always lead with parent A
+    if (Math.random() < 0.5) {
+      return wB + connector + wA;
+    }
+    return wA + connector + wB;
+  }
+
+  // ---------- IFRAME RENDERER ----------
+  function buildIframeSrc(primitive, knobs, theme) {
+    const isDark = theme === 'dark';
+    const fg = isDark ? '#ececea' : '#1a1a1a';
+    const fg2 = isDark ? '#a8a8a3' : '#5a5a55';
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0;background:transparent;color:${fg};font-family:-apple-system,sans-serif;font-size:10px;overflow:hidden;}
+  svg{display:block;width:100%;height:100%;overflow:hidden;}
+  text{fill:${fg2};font-size:8px;}
+  .axis path,.axis line{stroke:${fg2};stroke-width:0.5;}
+</style>
+</head><body>
+<svg id="canvas" viewBox="0 0 200 140" preserveAspectRatio="xMidYMid meet"></svg>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"><\/script>
+<script>
+(function(){
+  const width = 200, height = 140;
+  const svg = d3.select('#canvas');
+  const data = ${JSON.stringify(dataPayload)};
+  const knobs = ${JSON.stringify(knobs)};
+  const palettes = {
+    cool: ['#378ADD','#1D9E75','#7F77DD','#85b7eb','#5AAFCB'],
+    warm: ['#D85A30','#EF9F27','#993C1D','#C76E47','#E5A872'],
+    diverging: ['#993C1D','#D85A30','#EF9F27','#85b7eb','#185fa5'],
+    mono: ['${fg}','${fg2}','#888'],
+    qualitative: ['#378ADD','#D85A30','#1D9E75','#EF9F27','#7F77DD','#993556','#0F6E56','#5AAFCB']
+  };
+  function palette(name, n) {
+    const p = palettes[name] || palettes.qualitative;
+    if (!n) return p.slice();
+    if (n <= p.length) return p.slice(0, n);
+    const interp = d3.interpolateRgb(p[0], p[p.length-1]);
+    return d3.range(n).map(i => interp(i/(n-1)));
+  }
+  function reportError(msg) { parent.postMessage({ type:'breeder-error', message: String(msg) }, '*'); }
+  function reportReady() { parent.postMessage({ type:'breeder-ready' }, '*'); }
+  window.addEventListener('error', (e) => { reportError((e.message || 'unknown error')); return true; });
+  try {
+    ${primitive.code}
+    requestAnimationFrame(() => requestAnimationFrame(() => reportReady()));
+  } catch(err) {
+    reportError(err.message || String(err));
+  }
+})();
+<\/script>
+</body></html>`;
+  }
+  function currentTheme() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function renderGenome(wrap, genome, primitives) {
+    const prim = primitives.find(p => p.id === genome.primitive);
+    if (!prim) {
+      wrap.innerHTML = '<div class="error-card"><div class="error-tag">missing primitive</div><div class="error-msg">' + escapeHtml(genome.primitive || '?') + '</div></div>';
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts');
+    wrap.innerHTML = '';
+    wrap.appendChild(iframe);
+    let settled = false;
+    const handler = (e) => {
+      if (e.source !== iframe.contentWindow) return;
+      if (!e.data || !e.data.type) return;
+      if (e.data.type === 'breeder-error') {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', handler);
+        wrap.innerHTML = '<div class="error-card"><div class="error-tag">render error</div><div class="error-msg">'+escapeHtml(e.data.message)+'</div></div>';
+      } else if (e.data.type === 'breeder-ready') {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', handler);
+      }
+    };
+    window.addEventListener('message', handler);
+    setTimeout(() => { settled = true; window.removeEventListener('message', handler); }, 4000);
+    iframe.srcdoc = buildIframeSrc(prim, genome.knobs, currentTheme());
+  }
+
+  // ---------- LLM SEED CALL ----------
+  async function seedVocabulary(count, existing) {
+    const existingNames = (existing || []).map(p => p.title).join(', ');
+    const prompt = `Generate ${count} parameterized D3 chart primitives for a dashboard breeder. Each primitive is a self-contained drawing function that takes a \`knobs\` object and renders into the global \`svg\`.
+
+CONTEXT — the sandbox:
+- viewBox 0 0 200 140. ALL drawn content must fit inside.
+- Globals: \`d3\` (v7), \`data\`, \`svg\` (d3 selection), \`width\` (200), \`height\` (140), \`palette(name, n)\`, \`knobs\` (the parameter object).
+- \`data\` shape: { counties: [{id, state, base, current, covidSpike, recoverySlope, monthly:[72 numbers], nameLen}], states: [{state, monthly, current, base, covidSpike, recoverySlope, countyCount, tileCol, tileRow}], national: {monthly:[72]}, tileGrid: {cols:10, rows:7} }
+- \`data.states[i].tileCol\` and \`tileRow\` give each state a position on a stylized US tile grid (FiveThirtyEight-style tilegram). Use these to draw map-like layouts.
+- Palettes available: 'cool', 'warm', 'diverging', 'qualitative', 'mono'
+
+KNOBS each primitive can use (declare which ones it reads):
+- metric: 'currentRate', 'baseRate', 'covidSpike', 'recoverySlope', 'variance'. (For 'variance': std-dev of monthly array.)
+- palette: 'cool' | 'warm' | 'diverging' | 'qualitative' | 'mono'
+- sort: 'ascending' | 'descending' | 'alphabetical' | 'random' | 'unsorted'
+- density: 0.3 | 0.5 | 0.7 | 1.0
+- transform: 'linear' | 'log' | 'sqrt' | 'inverted'
+- granularity: 'county' | 'state' | 'national'
+- timeMode: 'forward' | 'reversed' | 'circular' | 'spiraled'
+
+TITLES MATTER:
+- Each primitive's title should be evocative, 2-4 words, lowercase. Examples: "state ranks", "spike timeline", "voronoi mosaic", "the slow recovery", "spiral years", "county hex map". These titles will be MASHED with other titles to name children — so they should contain interesting nouns and adjectives, not just chart-type names.
+- AVOID generic chart names alone ("bar chart", "scatter plot"). Use evocative words that suggest what the chart shows.
+
+THUMBNAIL DISCIPLINE:
+- Text ≤7px or omitted entirely.
+- All content inside 200×140.
+- Only d3.* and palette() available — no other libraries.
+- Months are integer indices 0-71. For years: 2019 + Math.floor(m/12).
+- Each primitive must respect ALL knobs it declares — use them to actually change the rendering.
+
+DIVERSITY:
+- Include a wide range: cartesian, polar, radial, voronoi, force-directed, treemap, sankey-ish, hex grids, beeswarm, parallel coords, contour, chord, arc, ridgeline, stream, isotype/dot matrix, sunburst, calendar grids, spirals, hexbin, etc.
+- AT LEAST 5 of the primitives MUST be map-like layouts using \`data.states[i].tileCol/tileRow\`. Examples: hex tilegram, sparkline-per-tile, small-multiple grid preserving state position, tile heatmap.
+- AT LEAST 8 should use unusual/distinctive layouts (not just bar/line/scatter variants).
+${existingNames ? '- ALREADY HAVE these primitives (do NOT duplicate): ' + existingNames : ''}
+
+OUTPUT FORMAT — CRITICAL:
+Use XML with CDATA. No JSON. No markdown.
+
+<primitives>
+  <primitive>
+    <id>unique_snake_case_id</id>
+    <title>2-4 words lowercase, evocative</title>
+    <description>one sentence about what shape this draws and what it's good at showing</description>
+    <knobs>comma,separated,knob,names</knobs>
+    <code><![CDATA[
+// drawing code that uses knobs.* and reads data
+]]></code>
+  </primitive>
+  ... ${count} primitives total
+</primitives>
+
+Exactly ${count} primitives. Output nothing but the XML.`;
+
+    const response = await fetch(PROXY_URL, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        max_tokens: 16000,
+        messages:[{ role:"user", content: prompt }]
+      })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    const text = data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+    return parsePrimitivesXml(text);
+  }
+
+  function parsePrimitivesXml(text) {
+    const primRegex = /<primitive>([\s\S]*?)<\/primitive>/g;
+    const primitives = [];
+    let m;
+    while ((m = primRegex.exec(text)) !== null) {
+      const block = m[1];
+      const knobsStr = extractTag(block, 'knobs') || '';
+      const knobs = knobsStr.split(',').map(k => k.trim()).filter(k => k && KNOB_SPACE[k]);
+      primitives.push({
+        id: extractTag(block, 'id') || 'unnamed_' + primitives.length,
+        title: extractTag(block, 'title') || '(untitled)',
+        description: extractTag(block, 'description') || '',
+        knobs,
+        code: extractTag(block, 'code') || ''
+      });
+    }
+    return primitives;
+  }
+  function extractTag(block, tag) {
+    const cdataRegex = new RegExp('<' + tag + '>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*<\\/' + tag + '>', 'i');
+    const cdataMatch = cdataRegex.exec(block);
+    if (cdataMatch) return cdataMatch[1].trim();
+    const plainRegex = new RegExp('<' + tag + '>([\\s\\S]*?)<\\/' + tag + '>', 'i');
+    const plainMatch = plainRegex.exec(block);
+    if (plainMatch) return plainMatch[1].trim();
+    return null;
+  }
+
+  // ---------- CLIENT-SIDE EVOLUTION ----------
+  function crossover(parentA, parentB, primitives) {
+    const usePrimAFor = Math.random() < 0.5;
+    const childPrim = usePrimAFor ? parentA.primitive : parentB.primitive;
+    const prim = primitives.find(p => p.id === childPrim);
+    if (!prim) return randomGenome(primitives[0].id, primitives);
+    const knobs = {};
+    (prim.knobs || []).forEach(k => {
+      const fromA = parentA.knobs && parentA.knobs[k];
+      const fromB = parentB.knobs && parentB.knobs[k];
+      if (fromA !== undefined && fromB !== undefined) {
+        knobs[k] = Math.random() < 0.5 ? fromA : fromB;
+      } else if (fromA !== undefined) {
+        knobs[k] = fromA;
+      } else if (fromB !== undefined) {
+        knobs[k] = fromB;
+      } else {
+        knobs[k] = randChoice(KNOB_SPACE[k] || ['default']);
+      }
+    });
+    return { primitive: childPrim, knobs };
+  }
+
+  function mutate(genome, primitives, rate) {
+    rate = rate || 0.3;
+    const newGenome = { primitive: genome.primitive, knobs: Object.assign({}, genome.knobs) };
+    Object.keys(newGenome.knobs).forEach(k => {
+      if (Math.random() < rate) {
+        const options = KNOB_SPACE[k] || ['default'];
+        newGenome.knobs[k] = randChoice(options.filter(o => o !== newGenome.knobs[k])) || newGenome.knobs[k];
+      }
+    });
+    if (Math.random() < 0.15 && primitives.length > 1) {
+      const otherPrims = primitives.filter(p => p.id !== newGenome.primitive);
+      const newPrim = randChoice(otherPrims);
+      const inheritedKnobs = {};
+      (newPrim.knobs || []).forEach(k => {
+        inheritedKnobs[k] = (newGenome.knobs[k] !== undefined) ? newGenome.knobs[k] : randChoice(KNOB_SPACE[k] || ['default']);
+      });
+      newGenome.primitive = newPrim.id;
+      newGenome.knobs = inheritedKnobs;
+    }
+    return newGenome;
+  }
+
+  function breedFour(parentA, parentB, primitives) {
+    const children = [];
+    for (let i = 0; i < 4; i++) {
+      let child = crossover(parentA, parentB, primitives);
+      child = mutate(child, primitives, i === 3 ? 0.6 : 0.25);
+      const prim = primitives.find(p => p.id === child.primitive);
+      child.title = mashTitle(parentA, parentB);
+      child.description = prim ? prim.description : '';
+      child.lineage_note = (parentA.title || '?') + ' × ' + (parentB.title || '?') + ' (primitive: ' + (prim ? prim.title : child.primitive) + ')';
+      children.push(child);
+    }
+    return children;
+  }
+
+  // ---------- STATE ----------
+  let primitives = [];
+  let history = [];
+  let currentGen = 1;
+  let pool = [];
+  let selected = [];
+
+  // ---------- STORAGE ----------
+  const STORAGE_KEY = 'breeder_clean_vocab_v1';
+  async function loadVocab() {
+    try {
+      if (typeof window.storage === 'undefined') return null;
+      const stored = await window.storage.get(STORAGE_KEY);
+      if (stored) return JSON.parse(stored.value);
+    } catch(e) { /* not present */ }
+    return null;
+  }
+  async function saveVocab(vocab) {
+    try {
+      if (typeof window.storage === 'undefined') return;
+      await window.storage.set(STORAGE_KEY, JSON.stringify(vocab));
+    } catch(e) { console.warn('save vocab failed', e); }
+  }
+
+  // ---------- UI ----------
+  function setStatus(msg, isError) {
+    const el = document.getElementById('status');
+    el.textContent = msg || '';
+    el.style.color = isError ? 'var(--err)' : '';
+  }
+  function updateBreedButton() {
+    const btn = document.getElementById('breed');
+    btn.textContent = 'breed selected (' + selected.length + '/2)';
+    btn.disabled = selected.length !== 2;
+  }
+  function escapeHtml(s) {
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function showSeedScreen() {
+    document.getElementById('seed-screen').style.display = 'block';
+    document.getElementById('grid').style.display = 'none';
+    document.querySelector('.controls').style.display = 'none';
+    document.querySelector('.instructions').style.display = 'none';
+  }
+  function hideSeedScreen() {
+    document.getElementById('seed-screen').style.display = 'none';
+    document.getElementById('grid').style.display = 'grid';
+    document.querySelector('.controls').style.display = 'flex';
+    document.querySelector('.instructions').style.display = 'block';
+  }
+
+  function renderGrid() {
+    document.getElementById('vocab-count').textContent = 'vocabulary: ' + primitives.length + ' primitives';
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    pool.forEach((card, idx) => {
+      const wrapId = 'wrap-' + currentGen + '-' + idx + '-' + Math.random().toString(36).slice(2,6);
+      const el = document.createElement('div');
+      el.className = 'card' + (selected.includes(idx) ? ' selected' : '');
+      const selectionOrder = selected.indexOf(idx);
+      el.innerHTML =
+        '<div class="select-badge">' + (selectionOrder >= 0 ? (selectionOrder+1) : '') + '</div>' +
+        '<div class="card-actions"><button class="icon-btn inspect" data-action="inspect" title="inspect">🔍</button></div>' +
+        '<div class="card-title">' + escapeHtml(card.title || '(untitled)') + '</div>' +
+        '<div class="chart-wrap" id="' + wrapId + '"></div>' +
+        '<div class="card-footer">' +
+          '<span>gen ' + currentGen + '</span>' +
+        '</div>';
+      el.onclick = (e) => {
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn && actionBtn.dataset.action === 'inspect') { openInspector(card); return; }
+        toggleSelect(idx);
+      };
+      grid.appendChild(el);
+      setTimeout(() => { renderGenome(document.getElementById(wrapId), card, primitives); }, 0);
+    });
+    document.getElementById('gen-label').textContent = 'generation ' + currentGen;
+    const h = document.getElementById('history');
+    h.innerHTML = history.length ? 'lineage: ' + history.join(' → ') : '';
+    updateBreedButton();
+  }
+
+  function toggleSelect(idx) {
+    const pos = selected.indexOf(idx);
+    if (pos >= 0) selected.splice(pos, 1);
+    else { if (selected.length >= 2) selected.shift(); selected.push(idx); }
+    renderGrid();
+  }
+
+  function openInspector(genome) {
+    document.getElementById('modal-title').textContent = genome.title || '(untitled)';
+    const prim = primitives.find(p => p.id === genome.primitive);
+    document.getElementById('modal-subtitle').textContent = prim ? prim.description : '';
+    document.getElementById('modal-lineage').textContent = genome.lineage_note || 'seed (generation 1)';
+    const chartWrap = document.getElementById('modal-chart');
+    chartWrap.innerHTML = '';
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts');
+    chartWrap.appendChild(iframe);
+    iframe.srcdoc = buildIframeSrc(prim, genome.knobs, currentTheme());
+    document.getElementById('modal').classList.add('open');
+  }
+  function closeInspector() {
+    document.getElementById('modal').classList.remove('open');
+    document.getElementById('modal-chart').innerHTML = '';
+  }
+
+  function doBreeding() {
+    if (selected.length !== 2) return;
+    const parentA = pool[selected[0]];
+    const parentB = pool[selected[1]];
+    history.push((parentA.title||'?') + ' × ' + (parentB.title||'?'));
+    currentGen += 1;
+    selected = [];
+    pool = breedFour(parentA, parentB, primitives);
+    renderGrid();
+  }
+
+  function initPool() {
+    pool = [];
+    const shuffled = primitives.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < 4 && i < shuffled.length; i++) {
+      const g = randomGenome(shuffled[i].id, primitives);
+      g.title = shuffled[i].title;
+      g.description = shuffled[i].description;
+      g.lineage_note = 'seed (generation 1)';
+      pool.push(g);
+    }
+  }
+
+  document.getElementById('breed').onclick = doBreeding;
+  document.getElementById('modal-close').onclick = closeInspector;
+  document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeInspector(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeInspector(); });
+  document.getElementById('reset').onclick = () => {
+    history = []; currentGen = 1; selected = [];
+    initPool();
+    renderGrid();
+  };
+  document.getElementById('expand-vocab').onclick = async () => {
+    setStatus('adding more chart primitives to the vocabulary...');
+    try {
+      const more = await seedVocabulary(10, primitives);
+      primitives = primitives.concat(more);
+      await saveVocab(primitives);
+      setStatus('vocabulary expanded to ' + primitives.length + ' primitives');
+      renderGrid();
+    } catch(e) {
+      setStatus('expand failed: ' + e.message, true);
+    }
+  };
+  document.getElementById('seed-btn').onclick = async () => {
+    const btn = document.getElementById('seed-btn');
+    btn.disabled = true;
+    const ss = document.getElementById('seed-status');
+    ss.textContent = 'loading 40 chart primitives. one moment...';
+    try {
+      const seeded = await seedVocabulary(40, []);
+      if (seeded.length < 4) throw new Error('only got ' + seeded.length + ' primitives, need at least 4');
+      primitives = seeded;
+      await saveVocab(primitives);
+      hideSeedScreen();
+      initPool();
+      renderGrid();
+    } catch(e) {
+      ss.textContent = 'load failed: ' + e.message;
+      btn.disabled = false;
+    }
+  };
+
+  (async function boot() {
+    const stored = await loadVocab();
+    if (stored && stored.length >= 4) {
+      primitives = stored;
+      hideSeedScreen();
+      initPool();
+      renderGrid();
+    } else {
+      showSeedScreen();
+    }
+  })();
+})();
+</script>
+</body>
+</html>
